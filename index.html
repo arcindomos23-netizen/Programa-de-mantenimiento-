@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Flota - MPP & LUB Medellín</title>
+  <!-- SEO & Fonts -->
+  <meta name="description" content="Aplicativo de gestión y control de mantenimiento preventivo, predictivo y lubricación de flota de vehículos.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS (xlsx) for Excel Exporting -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <i class="fa-solid fa-truck-monster"></i>
+        </div>
+        <div class="sidebar-title">
+          <h1>Gestión de Flota</h1>
+          <p>MPP & LUB - Medellín</p>
+        </div>
+      </div>
+      
+      <nav class="nav-menu">
+        <div class="nav-item active" id="nav-dashboard" data-view="dashboard-view">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-item" id="nav-vehicles" data-view="vehicles-view">
+          <i class="fa-solid fa-truck"></i>
+          <span>Directorio de Móviles</span>
+        </div>
+        <div class="nav-item" id="nav-maintenance" data-view="maintenance-view">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+          <span>Control LUB / MPP</span>
+        </div>
+        <div class="nav-item" id="nav-predictive" data-view="predictive-view">
+          <i class="fa-solid fa-magnifying-glass-chart"></i>
+          <span>Análisis Predictivo</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="btn-export" id="btn-export-excel" title="Exportar toda la base de datos a Excel">
+          <i class="fa-solid fa-file-excel"></i>
+          <span>Exportar a Excel</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- 1. DASHBOARD VIEW -->
+      <section class="view-section active" id="dashboard-view">
+        <div class="page-header">
+          <div class="page-title">
+            <h2>Panel de Control</h2>
+            <p>Estado operacional y alertas críticas de la flota de vehículos.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-secondary" id="btn-reload-data">
+              <i class="fa-solid fa-rotate"></i>
+              <span>Refrescar Datos</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPIs Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card" id="kpi-total-vehicles">
+            <div class="kpi-info">
+              <span class="kpi-label">Flota Activa</span>
+              <span class="kpi-value" id="val-total-vehicles">0</span>
+              <span class="kpi-sub">Móviles registrados</span>
+            </div>
+            <div class="kpi-icon kpi-blue">
+              <i class="fa-solid fa-truck-moving"></i>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-alerts-lub">
+            <div class="kpi-info">
+              <span class="kpi-label">Vencidos LUB</span>
+              <span class="kpi-value" id="val-alerts-lub">0</span>
+              <span class="kpi-sub" id="sub-alerts-lub">Móviles pasados</span>
+            </div>
+            <div class="kpi-icon kpi-red">
+              <i class="fa-solid fa-oil-can"></i>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-alerts-mpp">
+            <div class="kpi-info">
+              <span class="kpi-label">Vencidos MPP</span>
+              <span class="kpi-value" id="val-alerts-mpp">0</span>
+              <span class="kpi-sub" id="sub-alerts-mpp">Inspecciones pasadas</span>
+            </div>
+            <div class="kpi-icon kpi-yellow">
+              <i class="fa-solid fa-calendar-times"></i>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-expired-docs">
+            <div class="kpi-info">
+              <span class="kpi-label">SOAT / RTM</span>
+              <span class="kpi-value" id="val-expired-docs">0</span>
+              <span class="kpi-sub">Documentos vencidos</span>
+            </div>
+            <div class="kpi-icon kpi-green">
+              <i class="fa-solid fa-file-invoice"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Layout Details -->
+        <div class="dashboard-details">
+          <!-- Critical Alerts Panel -->
+          <div class="dashboard-panel" id="panel-critical-alerts">
+            <div class="panel-header">
+              <h3>Alertas Críticas de Mantenimiento</h3>
+              <span class="badge badge-pasado" id="badge-alert-count">0 Alertas</span>
+            </div>
+            <div class="alert-list" id="dashboard-alert-list">
+              <!-- Rendered dynamically -->
+              <div class="empty-state">
+                <i class="fa-solid fa-circle-check" style="color: var(--status-vigente)"></i>
+                <p>No hay alertas críticas. Toda la flota está al día.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Distribution Chart Panel -->
+          <div class="dashboard-panel" id="panel-distribution-chart">
+            <div class="panel-header">
+              <h3>Estado de Mantenimiento</h3>
+            </div>
+            <div class="dist-chart-container">
+              <svg width="180" height="180" class="svg-donut">
+                <circle class="donut-ring" cx="90" cy="90" r="70" fill="transparent" stroke-width="20"></circle>
+                <circle class="donut-segment-vigente" id="chart-segment-vigente" cx="90" cy="90" r="70" fill="transparent" stroke-width="20" stroke-dashoffset="0"></circle>
+                <circle class="donut-segment-pasado" id="chart-segment-pasado" cx="90" cy="90" r="70" fill="transparent" stroke-width="20" stroke-dashoffset="0"></circle>
+                <g class="donut-chart-text">
+                  <text x="50%" y="47%" text-anchor="middle" font-size="22" font-weight="700" id="chart-percent-text">0%</text>
+                  <text x="50%" y="62%" text-anchor="middle" font-size="11" fill="var(--text-secondary)" font-weight="500">AL DÍA</text>
+                </g>
+              </svg>
+              <div class="chart-legend">
+                <div class="legend-item">
+                  <span class="legend-color legend-vigente"></span>
+                  <span id="legend-vigente-text">Vigentes (0)</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-color legend-pasado"></span>
+                  <span id="legend-pasado-text">Vencidos (0)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. VEHICLES DIRECTORY VIEW -->
+      <section class="view-section" id="vehicles-view">
+        <div class="page-header">
+          <div class="page-title">
+            <h2>Directorio de Móviles</h2>
+            <p>Listado completo y filtros de todos los vehículos de la flota.</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-add-vehicle">
+              <i class="fa-solid fa-plus"></i>
+              <span>Nuevo Móvil</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search and Filters Bar -->
+        <div class="control-bar">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="search-vehicle-input" placeholder="Buscar por Móvil, Placa, Línea o Población...">
+          </div>
+          <div class="filter-group">
+            <select class="select-filter" id="filter-poblacion">
+              <option value="">Todas las Poblaciones</option>
+              <!-- Populated dynamically -->
+            </select>
+            <select class="select-filter" id="filter-status-lub">
+              <option value="">Estado Lubricación (Todos)</option>
+              <option value="VIGENTE">Lubricación Vigente</option>
+              <option value="PASADO">Lubricación Vencida</option>
+              <option value="SIN_DATOS">Sin datos LUB</option>
+            </select>
+            <select class="select-filter" id="filter-status-mpp">
+              <option value="">Estado MPP (Todos)</option>
+              <option value="VIGENTE">MPP Vigente</option>
+              <option value="PASADO">MPP Vencido</option>
+              <option value="SIN_DATOS">Sin datos MPP</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Vehicles Grid/Table Container -->
+        <div class="table-container">
+          <div class="table-scroll">
+            <table class="data-table" id="vehicles-table">
+              <thead>
+                <tr>
+                  <th>Móvil</th>
+                  <th>Placa</th>
+                  <th>Línea de Vehículo</th>
+                  <th>Población</th>
+                  <th>LUB Motor</th>
+                  <th>LUB Estado</th>
+                  <th>MPP Último</th>
+                  <th>MPP Estado</th>
+                </tr>
+              </thead>
+              <tbody id="vehicles-table-body">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+          <!-- Pagination -->
+          <div class="table-footer">
+            <span id="vehicles-page-info">Mostrando 1-25 de 225 vehículos</span>
+            <div class="pagination-controls" id="vehicles-pagination">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. MAINTENANCE CONTROL VIEW -->
+      <section class="view-section" id="maintenance-view">
+        <div class="page-header">
+          <div class="page-title">
+            <h2>Control LUB / MPP</h2>
+            <p>Monitoreo y actualización de planes de lubricación e inspecciones preventivas.</p>
+          </div>
+        </div>
+
+        <div class="sub-tab-container">
+          <button class="sub-tab-btn active" id="sub-tab-lub" data-mode="lub">Lubricación Motor</button>
+          <button class="sub-tab-btn" id="sub-tab-mpp" data-mode="mpp">Inspección Preventiva (MPP)</button>
+        </div>
+
+        <div class="schedule-split-container">
+          <div class="table-container">
+            <div class="table-scroll">
+              <table class="data-table" id="schedule-table">
+                <thead>
+                  <tr id="schedule-table-headers">
+                    <!-- Dynamic headers depending on sub-tab -->
+                  </tr>
+                </thead>
+                <tbody id="schedule-table-body">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+            <div class="table-footer">
+              <span id="schedule-page-info">Mostrando 1-10 de 50 móviles</span>
+              <div class="pagination-controls" id="schedule-pagination">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. PREDICTIVE ANALYSIS VIEW -->
+      <section class="view-section" id="predictive-view">
+        <div class="page-header">
+          <div class="page-title">
+            <h2>Análisis Predictivo</h2>
+            <p>Registro consolidado de hallazgos, correcciones y estados de análisis de muestras.</p>
+          </div>
+        </div>
+
+        <!-- Controls for Predictive -->
+        <div class="control-bar">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="search-predictive-input" placeholder="Buscar por Móvil, hallazgos, correcciones...">
+          </div>
+          <div class="filter-group">
+            <select class="select-filter" id="filter-predictive-status">
+              <option value="">Todos los Estados</option>
+              <option value="CRÍTICO">Crítico</option>
+              <option value="EN OBSERVACIÓN">En Observación</option>
+              <option value="NORMAL">Normal</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <div class="table-scroll">
+            <table class="data-table" id="predictive-table">
+              <thead>
+                <tr>
+                  <th>Móvil</th>
+                  <th>Fecha Análisis</th>
+                  <th>Fecha/KM Muestra</th>
+                  <th>Tipo / Clase</th>
+                  <th>Hallazgos</th>
+                  <th>Correcciones</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="predictive-table-body">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            <span id="predictive-page-info">Mostrando 1-20 de 100 registros</span>
+            <div class="pagination-controls" id="predictive-pagination">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- MODAL: ADD / EDIT VEHICLE -->
+  <div class="modal-overlay" id="modal-vehicle-form">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title">
+          <h3 id="vehicle-form-title">Agregar Nuevo Móvil</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-vehicle-form')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="form-vehicle" class="form-grid">
+          <div class="form-group">
+            <label for="input-movil">Número de Móvil *</label>
+            <input type="text" id="input-movil" required placeholder="Ej: 3285">
+          </div>
+          <div class="form-group">
+            <label for="input-placa">Placa</label>
+            <input type="text" id="input-placa" placeholder="Ej: PVS651">
+          </div>
+          <div class="form-group">
+            <label for="input-linea">Línea de Vehículo</label>
+            <input type="text" id="input-linea" placeholder="Ej: FURGON JMC 1054">
+          </div>
+          <div class="form-group">
+            <label for="input-poblacion">Población</label>
+            <input type="text" id="input-poblacion" placeholder="Ej: 02-Medellin">
+          </div>
+          <div class="form-group">
+            <label for="input-soat">Fecha de Vencimiento SOAT</label>
+            <input type="date" id="input-soat">
+          </div>
+          <div class="form-group">
+            <label for="input-rtm">Fecha de Vencimiento RTM</label>
+            <input type="date" id="input-rtm">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-vehicle-form')">Cancelar</button>
+        <button class="btn btn-primary" type="submit" form="form-vehicle">Guardar Vehículo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VEHICLE DETAIL (THE CORE INTERACTIVE PROFILE) -->
+  <div class="modal-overlay" id="modal-vehicle-detail">
+    <div class="modal-container" style="max-width: 900px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <h3 id="detail-vehicle-title">Móvil XXX - Ficha Técnica</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-vehicle-detail')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding-top: 12px;">
+        
+        <!-- Header Info Grid -->
+        <div class="detail-grid">
+          <div class="detail-block">
+            <div class="detail-block-header">Datos Básicos</div>
+            <div class="info-item"><span class="info-label">Placa:</span><span class="info-value" id="detail-placa">-</span></div>
+            <div class="info-item"><span class="info-label">Línea:</span><span class="info-value" id="detail-linea">-</span></div>
+            <div class="info-item"><span class="info-label">Población:</span><span class="info-value" id="detail-poblacion">-</span></div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-block-header">Documentos Legales</div>
+            <div class="info-item">
+              <span class="info-label">Vence SOAT:</span>
+              <span class="info-value" id="detail-soat">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Vence RTM:</span>
+              <span class="info-value" id="detail-rtm">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detail Tabs -->
+        <div class="modal-tabs">
+          <button class="modal-tab-btn active" data-tab="tab-maint-status">Estados LUB & MPP</button>
+          <button class="modal-tab-btn" data-tab="tab-predictive-hist">Análisis Predictivo</button>
+          <button class="modal-tab-btn" data-tab="tab-wash-ratings">Lavado y Lavadero</button>
+        </div>
+
+        <!-- Tab 1: Maintenance Status & Log Actions -->
+        <div class="tab-content active" id="tab-maint-status">
+          <div class="detail-grid">
+            <div class="detail-block">
+              <div class="detail-block-header">
+                <span>Lubricación Motor</span>
+                <span class="badge" id="detail-badge-lub">-</span>
+              </div>
+              <div class="info-item"><span class="info-label">Último Servicio:</span><span class="info-value" id="detail-last-lub">-</span></div>
+              <div class="info-item"><span class="info-label">KM del Aceite:</span><span class="info-value" id="detail-km-lub">-</span></div>
+              <div class="info-item"><span class="info-label">Frecuencia KM:</span><span class="info-value" id="detail-freq-km-lub">-</span></div>
+              <div class="info-item"><span class="info-label">Frecuencia Días:</span><span class="info-value" id="detail-freq-days-lub">-</span></div>
+              <button class="btn btn-secondary btn-sm" id="btn-action-lubricate" style="margin-top: 10px; font-size: 0.8rem; padding: 6px 12px;">
+                <i class="fa-solid fa-oil-can"></i> Registrar Lubricación
+              </button>
+            </div>
+            <div class="detail-block">
+              <div class="detail-block-header">
+                <span>Inspección Preventiva (MPP)</span>
+                <span class="badge" id="detail-badge-mpp">-</span>
+              </div>
+              <div class="info-item"><span class="info-label">Última Inspección:</span><span class="info-value" id="detail-last-mpp">-</span></div>
+              <div class="info-item"><span class="info-label">Tiempo transcurrido:</span><span class="info-value" id="detail-time-mpp">-</span></div>
+              <div class="info-item"><span class="info-label">KM Última Insp:</span><span class="info-value" id="detail-km-mpp">-</span></div>
+              <button class="btn btn-secondary btn-sm" id="btn-action-inspect" style="margin-top: 10px; font-size: 0.8rem; padding: 6px 12px;">
+                <i class="fa-solid fa-screwdriver-wrench"></i> Registrar Inspección (MPP)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Predictive Analysis Log & Add Entry -->
+        <div class="tab-content" id="tab-predictive-hist">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Register New Analysis (Mini-Form) -->
+            <details style="background-color: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px;">
+              <summary style="font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--accent-primary);">
+                <i class="fa-solid fa-plus-circle"></i> Agregar Reporte de Análisis Predictivo
+              </summary>
+              <form id="form-mini-predictive" class="form-grid" style="margin-top: 12px;">
+                <div class="form-group">
+                  <label for="mini-pred-fecha">Fecha Análisis</label>
+                  <input type="date" id="mini-pred-fecha" required>
+                </div>
+                <div class="form-group">
+                  <label for="mini-pred-fecha-km">Fecha y KM Muestra</label>
+                  <input type="text" id="mini-pred-fecha-km" required placeholder="Ej: KM: 95400 VISC: 15.1">
+                </div>
+                <div class="form-group">
+                  <label for="mini-pred-tipo">Tipo</label>
+                  <input type="text" id="mini-pred-tipo" placeholder="Ej: ACEITE MOTOR">
+                </div>
+                <div class="form-group">
+                  <label for="mini-pred-estado">Estado</label>
+                  <select id="mini-pred-estado" required>
+                    <option value="NORMAL">Normal</option>
+                    <option value="EN OBSERVACIÓN">En Observación</option>
+                    <option value="CRÍTICO">Crítico</option>
+                  </select>
+                </div>
+                <div class="form-group full-width">
+                  <label for="mini-pred-hallazgos">Hallazgos</label>
+                  <textarea id="mini-pred-hallazgos" required placeholder="Ej: Se evidencia presencia de agua o viscosidad baja..."></textarea>
+                </div>
+                <div class="form-group full-width">
+                  <label for="mini-pred-correcciones">Correcciones</label>
+                  <textarea id="mini-pred-correcciones" placeholder="Ej: Realizar cambio de empaque, filtro..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="grid-column: span 2; margin-top: 8px; justify-content: center;">Guardar Análisis</button>
+              </form>
+            </details>
+
+            <!-- History List -->
+            <div>
+              <h4 style="font-size: 0.95rem; margin-bottom: 8px; font-weight: 600; color: #fff;">Historial de Reportes</h4>
+              <div class="history-list" id="detail-predictive-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Wash Form & Wash History -->
+        <div class="tab-content" id="tab-wash-ratings">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <!-- Register Wash Rating (Mini-Form) -->
+            <details style="background-color: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px;">
+              <summary style="font-size: 0.9rem; font-weight: 600; cursor: pointer; color: var(--accent-primary);">
+                <i class="fa-solid fa-soap"></i> Registrar Evaluación de Lavado
+              </summary>
+              <form id="form-mini-wash" class="form-grid" style="margin-top: 12px;">
+                <div class="form-group">
+                  <label for="mini-wash-dirty">Suciedad del Vehículo (1-5)</label>
+                  <select id="mini-wash-dirty" required>
+                    <option value="1 - Muy Limpio">1 - Muy Limpio</option>
+                    <option value="2 - Limpio">2 - Limpio</option>
+                    <option value="3 - Normal">3 - Normal</option>
+                    <option value="4 - Sucio">4 - Sucio</option>
+                    <option value="5 - Muy Sucio">5 - Muy Sucio</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="mini-wash-participants">Personas que participaron</label>
+                  <input type="number" id="mini-wash-participants" min="1" max="10" value="1">
+                </div>
+                <div class="form-group">
+                  <label for="mini-wash-service">Calificación de Servicio (1-5)</label>
+                  <input type="number" id="mini-wash-service" min="1" max="5" value="5">
+                </div>
+                <div class="form-group">
+                  <label for="mini-wash-type">Apropiado para Lavado</label>
+                  <select id="mini-wash-type" required>
+                    <option value="VEHÍCULO APROPIADO PARA LAVADO">Apropiado para lavado</option>
+                    <option value="VEHÍCULO CON PINTURA DEFECTUOSA">Pintura defectuosa</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
+                <div class="form-group full-width">
+                  <label for="mini-wash-obs">Observaciones / Comentarios</label>
+                  <textarea id="mini-wash-obs" placeholder="Ej: Se lavó chasis y cabina exterior..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="grid-column: span 2; margin-top: 8px; justify-content: center;">Guardar Registro de Lavado</button>
+              </form>
+            </details>
+
+            <!-- Wash History List -->
+            <div>
+              <h4 style="font-size: 0.95rem; margin-bottom: 8px; font-weight: 600; color: #fff;">Evaluaciones de Lavado</h4>
+              <div class="history-list" id="detail-wash-list">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-vehicle-detail')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MANUAL MAINTENANCE UPDATE -->
+  <div class="modal-overlay" id="modal-update-maint">
+    <div class="modal-container" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <h3 id="update-maint-title">Registrar Servicio</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeModal('modal-update-maint')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form id="form-update-maint" class="form-grid" style="grid-template-columns: 1fr;">
+          <input type="hidden" id="update-maint-movil">
+          <input type="hidden" id="update-maint-type">
+          
+          <div class="form-group">
+            <label for="update-maint-date" id="lbl-update-date">Fecha de Servicio *</label>
+            <input type="date" id="update-maint-date" required>
+          </div>
+          <div class="form-group" id="group-update-km">
+            <label for="update-maint-km">Kilometraje del Vehículo *</label>
+            <input type="number" id="update-maint-km" min="0" placeholder="Ej: 125000">
+          </div>
+          <div class="form-group" id="group-update-freq-km">
+            <label for="update-maint-freq-km">Frecuencia en Kilómetros (Por Defecto: 5000)</label>
+            <input type="number" id="update-maint-freq-km" value="5000" min="100">
+          </div>
+          <div class="form-group" id="group-update-freq-days">
+            <label for="update-maint-freq-days">Frecuencia en Días (Por Defecto: 180)</label>
+            <input type="number" id="update-maint-freq-days" value="180" min="1">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-update-maint')">Cancelar</button>
+        <button class="btn btn-primary" type="submit" form="form-update-maint">Guardar Servicio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript App Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
